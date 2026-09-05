@@ -127,13 +127,13 @@ def cmd_graveyard(args, root):
         if v.get("status") == "refuted" or s.get("status") == "abandoned":
             failed = [r["id"] for r in v.get("predictions", []) if r["critical"] and r["outcome"] == "fail"]
             tag = " (exploratory)" if v.get("exploratory") else ""
-            dead.append((f"{th.get('name')}@{th.get('version', 1)}{tag}", d.name, failed, v.get("computed_at", "")))
+            dead.append((f"{th.get('name')}@{th.get('version', 1)}", tag, d.name, failed, v.get("computed_at", "")))
     if not dead:
         print("the graveyard is empty. Either nothing has been tested severely, or you are very good.")
         return 0
-    for key, slug, failed, when in dead:
+    for key, tag, slug, failed, when in dead:
         succ = successors.get(key)
-        print(f"{key}  ({slug})  died {when[:10]}  killed by: {', '.join(failed) or 'abandoned'}"
+        print(f"{key}{tag}  ({slug})  died {when[:10]}  killed by: {', '.join(failed) or 'abandoned'}"
               + (f"  ->  {succ}" if succ else "  (no successor)"))
 
 
