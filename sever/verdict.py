@@ -35,6 +35,7 @@ def compute(study: dict) -> dict:
         lr_pass, lr_fail, lr_inc, mode = likelihood_ratios(p)
         modes.add(mode)
         lr = {"pass": lr_pass, "fail": lr_fail, "inconclusive": lr_inc}[o]
+        boundary = lr == 0 or not math.isfinite(lr)
         if math.isfinite(lr) and lr > 0:
             log10_evidence += math.log10(lr)
         elif lr == 0:
@@ -44,7 +45,7 @@ def compute(study: dict) -> dict:
         critical = bool(p.get("critical"))
         rows.append({"id": p["id"], "critical": critical, "outcome": o,
                      "likelihood_ratio": round(lr, 3) if math.isfinite(lr) else "inf",
-                     "mode": mode, "weak_test": lr_pass < WEAK_LR - 1e-9})
+                     "mode": mode, "weak_test": lr_pass < WEAK_LR - 1e-9, "boundary": boundary})
         if critical and o == "fail":
             crit_fail += 1
         elif critical and o == "inconclusive":
@@ -67,23 +68,27 @@ def compute(study: dict) -> dict:
         if passes and all(r["weak_test"] for r in passes):
             status = "supported-weakly"
     if zero_evidence and infinite_evidence:
-        raise StudyError("conflicting zero-probability forecasts; revise the forecast model")
-    if zero_evidence:
-        log10_evidence = -math.inf
-    elif infinite_evidence:
-        log10_evidence = math.inf
-    log_odds = math.log(prior) - math.log1p(-prior) + log10_evidence * math.log(10)
-    if log_odds >= 0:
-        posterior = 1 / (1 + math.exp(-log_odds))
+        posterior = None
+        log10_evidence = math.nan
     else:
-        odds = math.exp(log_odds)
-        posterior = odds / (1 + odds)
+        if zero_evidence:
+            log10_evidence = -math.inf
+        elif infinite_evidence:
+            log10_evidence = math.inf
+        log_odds = math.log(prior) - math.log1p(-prior) + log10_evidence * math.log(10)
+        if log_odds >= 0:
+            posterior = 1 / (1 + math.exp(-log_odds))
+        else:
+            odds = math.exp(log_odds)
+            posterior = odds / (1 + odds)
+        posterior = round(posterior, 4)
     return {
         "status": status,
         "prior_credence": prior,
-        "posterior_credence": round(posterior, 4),
+        "posterior_credence": posterior,
+        "boundary_inputs": [r["id"] for r in rows if r["boundary"]],
         "log10_evidence": round(log10_evidence, 3),
-        "likelihood_mode": "binary" if "binary" in modes else "three-outcome",
+        "likelihood_mode": "legacy" if "legacy" in modes else "three-outcome",
         "predictions": rows,
         "missing": missing,
         "computed_at": now_iso(),
@@ -95,11 +100,15 @@ def report(study: dict, v: dict, exploratory: bool = False) -> str:
     lines = [f"{th.get('name')} v{th.get('version', 1)}: {v['status'].upper()}"
              + ("  [EXPLORATORY: preregistration not intact; excluded from calibration]" if exploratory else "")]
     lines.append(STATUS_TEXT[v["status"]])
+    post = "undefined" if v["posterior_credence"] is None else f"{v['posterior_credence']:.2f}"
     lines.append(f"forecast bookkeeping, heuristic and not a calibrated posterior: credence "
-                 f"{v['prior_credence']:.2f} -> {v['posterior_credence']:.2f}   "
+                 f"{v['prior_credence']:.2f} -> {post}   "
                  f"(log10 score {v['log10_evidence']:+.2f}; ratios multiplied as if independent"
-                 + ("; binary mode on some predictions, fail and inconclusive pooled as not-pass)"
-                    if v.get("likelihood_mode") == "binary" else ")"))
+                 + ("; legacy mode on some predictions: failure scored by the binary complement, inconclusive neutral)"
+                    if v.get("likelihood_mode") == "legacy" else ")"))
+    if v.get("boundary_inputs"):
+        lines.append("boundary forecasts (0 or 1) on " + ", ".join(v["boundary_inputs"])
+                     + ": the score is degenerate. Lint rejects these; this file predates that rule or bypassed it.")
     for r in v["predictions"]:
         flag = " critical" if r["critical"] else ""
         weak = "  weak test" if r["weak_test"] else ""

@@ -48,7 +48,7 @@ def test_three_outcome_likelihoods_do_not_reverse_evidence():
     assert abs(lr_fail - 3.0) < 1e-9          # binary mode would have given 0.25
     assert abs(lr_inc - 0.05 / 0.75) < 1e-9
     binary = likelihood_ratios({"p_pass_if_true": 0.8, "p_pass_if_false": 0.2})
-    assert binary[3] == "binary" and abs(binary[1] - 0.25) < 1e-9 and binary[2] == 1.0
+    assert binary[3] == "legacy" and abs(binary[1] - 0.25) < 1e-9 and binary[2] == 1.0
 
 
 def test_critical_inconclusive():
@@ -78,12 +78,6 @@ def test_critical_failure_refutes_even_with_missing_outcomes():
     assert result["status"] == "refuted" and result["missing"] == ["P2"]
 
 
-def test_zero_probability_rival_updates_credence():
-    study = base()
-    study["predictions"][0]["p_pass_if_false"] = 0
-    assert compute(study)["posterior_credence"] == 1
-
-
 def test_zero_likelihood_records_negative_infinite_evidence():
     import math
     study = base()
@@ -91,3 +85,33 @@ def test_zero_likelihood_records_negative_infinite_evidence():
     result = compute(study)
     assert result["posterior_credence"] == 0
     assert result["log10_evidence"] == -math.inf
+
+
+def test_infinite_ratio_is_not_skipped():
+    s = base()
+    s["predictions"][0]["p_pass_if_false"] = 0.0  # bypasses lint on purpose
+    v = compute(s)
+    assert v["posterior_credence"] == 1.0
+    assert v["boundary_inputs"] == ["P1"]
+
+
+def test_boundary_forecasts_are_lint_errors():
+    from sever.study import lint
+    study = {"slug": "s", "theory": {"statement": "x", "scope": "y", "prior_credence": 0.4},
+             "alternatives": [{"id": "H0", "statement": "z"}],
+             "predictions": [{"id": "P1", "statement": "s", "critical": True, "pass_if": "r < 1", "fail_if": "r > 2",
+                              "p_pass_if_true": 1.0, "p_pass_if_false": 0.2, "p_fail_if_true": 0.0, "p_fail_if_false": 0.5}],
+             "analysis_plan": "seeds fixed", "kill_rule": "k"}
+    errors, _ = lint(study, "s")
+    assert any("exactly 0 or 1" in e for e in errors)
+
+
+def test_conflicting_boundary_forecasts_are_undefined_in_either_order():
+    import math
+    study = base()
+    study["predictions"][0].update(p_pass_if_false=0, outcome="pass")
+    study["predictions"][1].update(p_pass_if_true=1, outcome="fail")
+    for predictions in (study["predictions"], list(reversed(study["predictions"]))):
+        result = compute({**study, "predictions": predictions})
+        assert result["posterior_credence"] is None
+        assert math.isnan(result["log10_evidence"])

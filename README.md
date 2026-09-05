@@ -74,6 +74,8 @@ studies/<slug>/notes.md       lab notebook, dated entries
 
 Only `outcome` and `evidence` on each prediction, plus everything under `results:` and `review:`, may change after the freeze.
 
+Give both P(pass | .) and P(fail | .) on every prediction. Without P(fail | .) the tool runs in a labelled legacy mode that is not a coherent three-outcome likelihood.
+
 A study can declare `exploratory: true` at the top. Use it for a post-hoc registration, when the criteria were written after the data existed. Lint then allows outcomes without a freeze, `verdict` records the result, and `score` ignores it. The graveyard still lists it, tagged.
 
 ## What the tool refuses to do
