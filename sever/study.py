@@ -78,13 +78,14 @@ def likelihood_ratios(pred: dict) -> tuple[float, float, float, str]:
     """(LR if pass, LR if fail, LR if inconclusive, mode).
 
     mode is 'three-outcome' when P(fail | .) is given for both hypotheses, so that
-    inconclusive is the remainder and gets its own ratio. Otherwise mode is 'binary':
-    fail and inconclusive are pooled as 'not pass', and inconclusive gets LR 1 as a
-    heuristic. With three possible outcomes, 'not pass' is not 'fail'."""
+    inconclusive is the remainder and gets its own ratio. Otherwise mode is 'legacy':
+    a failure is scored by the binary complement (1 - P(pass | .)) and inconclusive is
+    left neutral at LR 1. That is not a coherent three-outcome likelihood and not a
+    literal pooling of fail and inconclusive; it is kept for old study files only."""
     a, b = float(pred["p_pass_if_true"]), float(pred["p_pass_if_false"])
     lr_pass = _ratio(a, b)
     if pred.get("p_fail_if_true") is None or pred.get("p_fail_if_false") is None:
-        return lr_pass, _ratio(1 - a, 1 - b), 1.0, "binary"
+        return lr_pass, _ratio(1 - a, 1 - b), 1.0, "legacy"
     ft, fr = float(pred["p_fail_if_true"]), float(pred["p_fail_if_false"])
     return lr_pass, _ratio(ft, fr), _ratio(1 - a - ft, 1 - b - fr), "three-outcome"
 
@@ -149,16 +150,21 @@ def lint(study: dict, slug: str | None = None, frozen: bool = False) -> tuple[li
                 E.append(f"{pid}: p_pass_if_true ({a}) must exceed p_pass_if_false ({b}); otherwise a pass is not evidence")
             elif a / max(b, 1e-9) < WEAK_LR - 1e-9:
                 W.append(f"{pid}: likelihood ratio {a / max(b, 1e-9):.1f} is below {WEAK_LR}; this is a weak test")
+            if a in (0.0, 1.0) or b in (0.0, 1.0):
+                E.append(f"{pid}: a forecast of exactly 0 or 1 is not a forecast and makes the score degenerate; use 0.01 or 0.99")
             ft, fr = p.get("p_fail_if_true"), p.get("p_fail_if_false")
             if ft is None or fr is None:
-                W.append(f"{pid}: no P(fail | .) given; fail and inconclusive are pooled as 'not pass' and "
-                         f"inconclusive gets LR 1 (binary mode, heuristic)")
+                W.append(f"{pid}: no P(fail | .) given; legacy mode scores a failure by the binary complement and "
+                         f"leaves inconclusive neutral. Not a coherent three-outcome likelihood; give P(fail | .) for new studies")
             else:
                 ft, fr = float(ft), float(fr)
                 if not (0 <= ft <= 1 and 0 <= fr <= 1):
                     E.append(f"{pid}: P(fail | .) must be in [0, 1]")
-                elif a + ft > 1 + 1e-9 or b + fr > 1 + 1e-9:
-                    E.append(f"{pid}: P(pass) + P(fail) exceeds 1 under one hypothesis")
+                elif ft in (0.0, 1.0) or fr in (0.0, 1.0):
+                    E.append(f"{pid}: a forecast of exactly 0 or 1 is not a forecast and makes the score degenerate; use 0.01 or 0.99")
+                elif a + ft > 1 - 1e-9 or b + fr > 1 - 1e-9:
+                    E.append(f"{pid}: P(pass) + P(fail) leaves no probability for inconclusive under one hypothesis; "
+                             f"if an outcome is impossible, say so in pass_if / fail_if and keep the forecasts interior")
         except (TypeError, ValueError):
             E.append(f"{pid}: p_pass_if_true and p_pass_if_false are required")
         if p.get("critical"):

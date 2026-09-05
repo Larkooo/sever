@@ -68,3 +68,22 @@ def test_only_weak_passes_is_weak_support():
     s = base()
     s["predictions"][0]["p_pass_if_true"], s["predictions"][0]["p_pass_if_false"] = 0.6, 0.4
     assert compute(s)["status"] == "supported-weakly"
+
+
+def test_infinite_ratio_is_not_skipped():
+    s = base()
+    s["predictions"][0]["p_pass_if_false"] = 0.0  # bypasses lint on purpose
+    v = compute(s)
+    assert v["posterior_credence"] == 1.0
+    assert v["boundary_inputs"] == ["P1"]
+
+
+def test_boundary_forecasts_are_lint_errors():
+    from sever.study import lint
+    study = {"slug": "s", "theory": {"statement": "x", "scope": "y", "prior_credence": 0.4},
+             "alternatives": [{"id": "H0", "statement": "z"}],
+             "predictions": [{"id": "P1", "statement": "s", "critical": True, "pass_if": "r < 1", "fail_if": "r > 2",
+                              "p_pass_if_true": 1.0, "p_pass_if_false": 0.2, "p_fail_if_true": 0.0, "p_fail_if_false": 0.5}],
+             "analysis_plan": "seeds fixed", "kill_rule": "k"}
+    errors, _ = lint(study, "s")
+    assert any("exactly 0 or 1" in e for e in errors)

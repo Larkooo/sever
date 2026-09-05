@@ -28,8 +28,10 @@ predictions:
     critical: true          # a critical failure refutes this version
     pass_if: ""             # operational, with numbers, decided now
     fail_if: ""             # operational, with numbers, decided now. Anything else is inconclusive.
-    p_pass_if_true: 0.8     # P(pass | theory true)
+    p_pass_if_true: 0.8     # P(pass | theory true). Forecasts, scored for calibration; not measured likelihoods.
     p_pass_if_false: 0.2    # P(pass | best rival true). A ratio under 3 is a demonstration, not a test.
+    p_fail_if_true: 0.1     # P(fail | theory true). With three outcomes, "not pass" is not "fail".
+    p_fail_if_false: 0.6    # P(fail | best rival true). Inconclusive is the remainder under each hypothesis.
     discriminates: [H0]     # rivals a pass counts against
     outcome: null           # pass | fail | inconclusive. Filled after data by applying the criteria literally.
     evidence: null          # the figure, table, or number that decided it
