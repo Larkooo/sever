@@ -146,7 +146,8 @@ def lint(study: dict, slug: str | None = None, frozen: bool = False) -> tuple[li
         if o is not None and o not in OUTCOMES:
             E.append(f"{pid}: outcome must be one of {sorted(OUTCOMES)}")
         if o is not None and not frozen:
-            E.append(f"{pid}: outcome recorded but the study was never frozen; this is exploratory, not a result")
+            msg = f"{pid}: outcome recorded but the study was never frozen; this is exploratory, not a result"
+            (W if study.get("exploratory") else E).append(msg)
     if preds and n_critical == 0:
         E.append("no prediction is marked critical; nothing could refute this theory")
     if not _text(study.get("analysis_plan")):

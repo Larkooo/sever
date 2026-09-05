@@ -103,3 +103,16 @@ def test_verdict_requires_review_and_intact_freeze(repo, capsys):
     v = load_yaml(repo / "studies/s1/verdict.yaml")
     assert v["status"] == "refuted" and not v["exploratory"]
     assert "REFUTED" in capsys.readouterr().out
+
+
+def test_exploratory_study_allows_outcomes_without_freeze(repo, capsys):
+    s = load_yaml(repo / "studies/s1/study.yaml")
+    s["exploratory"] = True
+    s["predictions"][0]["outcome"] = "fail"
+    save_yaml(repo / "studies/s1/study.yaml", s)
+    assert main(["--root", str(repo), "lint", "s1"]) == 0
+    assert main(["--root", str(repo), "verdict", "s1"]) == 0
+    v = load_yaml(repo / "studies/s1/verdict.yaml")
+    assert v["status"] == "refuted" and v["exploratory"]
+    from sever.score import collect
+    assert collect(repo) == []

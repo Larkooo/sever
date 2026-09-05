@@ -66,6 +66,8 @@ def cmd_verdict(args, root):
     d = study_dir(args.slug, root)
     study = load_yaml(d / "study.yaml")
     problems = fz.check(args.slug, root)
+    if study.get("exploratory"):
+        args.exploratory = True
     if problems and not args.exploratory:
         print(f"refusing to compute a verdict: {'; '.join(problems)}")
         print("either restore the frozen sections, or re-run with --exploratory to record a verdict that will not count")
@@ -75,7 +77,7 @@ def cmd_verdict(args, root):
         print("refusing to compute a verdict: review.strongest_objection is empty. Try to kill the result first.")
         return 1
     v = vd.compute(study)
-    v["exploratory"] = bool(problems) or bool(args.exploratory)
+    v["exploratory"] = bool(problems) or bool(args.exploratory) or bool(study.get("exploratory"))
     save_yaml(d / "verdict.yaml", v)
     print(vd.report(study, v, exploratory=v["exploratory"]))
     print(f"\nwritten {d.relative_to(root)}/verdict.yaml")
@@ -124,7 +126,8 @@ def cmd_graveyard(args, root):
         v = load_yaml(d / "verdict.yaml") if (d / "verdict.yaml").exists() else {}
         if v.get("status") == "refuted" or s.get("status") == "abandoned":
             failed = [r["id"] for r in v.get("predictions", []) if r["critical"] and r["outcome"] == "fail"]
-            dead.append((f"{th.get('name')}@{th.get('version', 1)}", d.name, failed, v.get("computed_at", "")))
+            tag = " (exploratory)" if v.get("exploratory") else ""
+            dead.append((f"{th.get('name')}@{th.get('version', 1)}{tag}", d.name, failed, v.get("computed_at", "")))
     if not dead:
         print("the graveyard is empty. Either nothing has been tested severely, or you are very good.")
         return 0

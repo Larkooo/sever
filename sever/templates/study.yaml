@@ -3,6 +3,7 @@
 slug: {slug}
 title: ""
 created: {date}
+exploratory: false          # true only for a post-hoc registration (criteria written after data). Its verdict never counts.
 
 theory:
   name: {slug}
