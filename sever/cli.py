@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
-import shutil
 import sys
 from importlib import resources
 from pathlib import Path
@@ -11,11 +10,14 @@ from pathlib import Path
 from . import freeze as fz
 from . import score as sc
 from . import verdict as vd
-from .study import StudyError, find_root, lint, load_yaml, save_yaml, studies_dir, study_dir
+from .study import (
+    StudyError, find_root, lint, load_study, load_yaml, save_yaml,
+    studies_dir, study_dir, study_path,
+)
 
 
 def cmd_new(args, root):
-    d = studies_dir(root) / args.slug
+    d = study_path(args.slug, root)
     if d.exists():
         raise StudyError(f"{d} already exists")
     d.mkdir(parents=True)
@@ -33,7 +35,7 @@ def cmd_lint(args, root):
     for slug in slugs:
         d = study_dir(slug, root)
         frozen = (d / "freeze.yaml").exists()
-        E, W = lint(load_yaml(d / "study.yaml"), slug, frozen=frozen)
+        E, W = lint(load_study(d / "study.yaml"), slug, frozen=frozen)
         if frozen:
             E += fz.check(slug, root)
         print(f"{slug}: {len(E)} errors, {len(W)} warnings")
@@ -64,7 +66,10 @@ def cmd_check(args, root):
 
 def cmd_verdict(args, root):
     d = study_dir(args.slug, root)
-    study = load_yaml(d / "study.yaml")
+    study = load_study(d / "study.yaml")
+    errors, _ = lint(study, args.slug, frozen=True)
+    if errors:
+        raise StudyError("invalid study: " + "; ".join(errors))
     problems = fz.check(args.slug, root)
     if study.get("exploratory"):
         args.exploratory = True
@@ -89,7 +94,7 @@ def cmd_status(args, root):
     for d in sorted(studies_dir(root).glob("*/")):
         if not (d / "study.yaml").exists():
             continue
-        s = load_yaml(d / "study.yaml")
+        s = load_study(d / "study.yaml")
         th = s.get("theory") or {}
         state = "draft"
         if (d / "freeze.yaml").exists():
@@ -119,7 +124,7 @@ def cmd_graveyard(args, root):
     for d in sorted(studies_dir(root).glob("*/")):
         if not (d / "study.yaml").exists():
             continue
-        s = load_yaml(d / "study.yaml")
+        s = load_study(d / "study.yaml")
         th = s.get("theory") or {}
         if th.get("supersedes"):
             successors[th["supersedes"]] = f"{th.get('name')}@{th.get('version', 1)} ({d.name})"
@@ -153,7 +158,7 @@ def main(argv=None):
     root = Path(args.root).resolve() if args.root else find_root()
     try:
         rc = args.fn(args, root)
-    except StudyError as e:
+    except (StudyError, OSError) as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
     return rc or 0

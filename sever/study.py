@@ -26,7 +26,7 @@ def now_iso() -> str:
 def find_root(start: Path | None = None) -> Path:
     p = (start or Path.cwd()).resolve()
     for q in [p, *p.parents]:
-        if (q / "studies").is_dir() or (q / ".git").is_dir():
+        if (q / "studies").is_dir() or (q / ".git").exists():
             return q
     return p
 
@@ -35,16 +35,75 @@ def studies_dir(root: Path) -> Path:
     return root / "studies"
 
 
-def study_dir(slug: str, root: Path) -> Path:
+def study_path(slug: str, root: Path) -> Path:
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", slug):
+        raise StudyError("study slug must be a single name using letters, numbers, dots, - or _")
     d = studies_dir(root) / slug
+    if d.resolve().parent != studies_dir(root).resolve():
+        raise StudyError("study directory must remain inside studies/")
+    return d
+
+
+def study_dir(slug: str, root: Path) -> Path:
+    d = study_path(slug, root)
     if not (d / "study.yaml").exists():
         raise StudyError(f"no study at {d}")
     return d
 
 
 def load_yaml(path: Path) -> dict:
-    with open(path) as fh:
-        return yaml.safe_load(fh) or {}
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = yaml.safe_load(fh)
+    except (OSError, yaml.YAMLError) as exc:
+        raise StudyError(f"cannot read {path}: {exc}") from exc
+    if data is None:
+        return {}
+    if not isinstance(data, dict):
+        raise StudyError(f"{path}: expected a YAML mapping")
+    return data
+
+
+def structure_errors(study: dict) -> list[str]:
+    errors = []
+    for field in ("theory", "review", "results"):
+        if study.get(field) is not None and not isinstance(study[field], dict):
+            errors.append(f"{field} must be a mapping")
+    review = study.get("review")
+    if isinstance(review, dict):
+        objection = review.get("strongest_objection")
+        if objection is not None and not isinstance(objection, str):
+            errors.append("review.strongest_objection must be a string or null")
+    for field in ("alternatives", "predictions"):
+        value = study.get(field)
+        if value is not None and (
+            not isinstance(value, list) or any(not isinstance(row, dict) for row in value)
+        ):
+            errors.append(f"{field} must be a list of mappings")
+            continue
+        for row in value or []:
+            if not isinstance(row.get("id"), str):
+                errors.append(f"{field} entries must have a string id")
+            if "critical" in row and not isinstance(row["critical"], bool):
+                errors.append("prediction.critical must be a boolean")
+            discriminates = row.get("discriminates", [])
+            if not isinstance(discriminates, list) or any(
+                not isinstance(item, str) for item in discriminates
+            ):
+                errors.append("prediction.discriminates must be a list of ids")
+            if row.get("outcome") is not None and not isinstance(row["outcome"], str):
+                errors.append("prediction.outcome must be a string or null")
+    if "exploratory" in study and not isinstance(study["exploratory"], bool):
+        errors.append("exploratory must be a boolean")
+    return errors
+
+
+def load_study(path: Path) -> dict:
+    study = load_yaml(path)
+    errors = structure_errors(study)
+    if errors:
+        raise StudyError(f"{path}: " + "; ".join(errors))
+    return study
 
 
 def save_yaml(path: Path, data: dict) -> None:
@@ -101,6 +160,8 @@ def _has_number(s: str) -> bool:
 def lint(study: dict, slug: str | None = None, frozen: bool = False) -> tuple[list[str], list[str]]:
     """Returns (errors, warnings). Errors block freezing."""
     E, W = [], []
+    if errors := structure_errors(study):
+        return errors, W
     if slug and study.get("slug") != slug:
         E.append(f"slug in file ({study.get('slug')!r}) does not match directory ({slug!r})")
     th = study.get("theory") or {}

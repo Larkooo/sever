@@ -1,6 +1,8 @@
 # sever
 
-Severe testing for research programmes. A theory earns belief only by surviving tests that could have killed it. `sever` makes the bookkeeping mechanical: predictions with numeric criteria are frozen to a git commit before any data exist, outcomes are recorded against those criteria, the verdict is computed rather than argued, refuted theories go to a graveyard, and your stated credences are scored for calibration over time.
+`sever` is a command-line tool for preregistering experiments in Git. Record a claim, competing explanations, numeric pass/fail criteria, and forecasts; freeze them to a commit; then record outcomes, compute a verdict, and track forecast calibration.
+
+Use it for model ablations, retrieval experiments, or performance changes where the criteria should be fixed before evaluation. The tool checks the record; you still run the experiment and supply the evidence.
 
 [METHOD.md](METHOD.md) is the method. This file is how to use the tool. [CLAUDE.md](CLAUDE.md) is the instruction set for an AI assistant working in a repository that uses it.
 
@@ -32,6 +34,21 @@ sever status                         # every study at a glance
 sever score                          # calibration of your stated credences
 sever graveyard                      # what died, what killed it, what replaced it
 ```
+
+## Runnable example
+
+After cloning this repository:
+
+```sh
+uv sync
+uv run python examples/demo.py
+```
+
+The demo creates a temporary Git repository, registers the
+[cache-latency study](examples/latency-study.yaml), freezes it, and exercises
+`check`, `verdict`, and `score`. It uses explicitly synthetic outcomes and removes
+the temporary repository when finished. It does not run a latency benchmark.
+Adapt the YAML criteria and analysis plan before freezing your own experiment.
 
 ## Commands
 
@@ -68,9 +85,30 @@ A study can declare `exploratory: true` at the top. Use it for a post-hoc regist
 - compute a verdict without an adversarial review
 - treat a critical failure as anything other than refutation
 
+## Limits
+
+A Git hash detects changes relative to a recorded commit. It does not establish
+that data were unseen, prevent history rewriting, validate evidence files, or
+prove that a study was run as described. Keep the measurement artifacts and an
+independent timestamp when those guarantees matter.
+
+Credence updates multiply stated likelihood ratios as if predictions were
+independent. They are forecast bookkeeping, not calibrated posterior estimates.
+Specify both pass and fail probabilities for three-outcome forecasts; otherwise
+inconclusive outcomes receive a neutral likelihood ratio in the heuristic update.
+
+Calibration scores the predicted probability of a **pass**: fail and inconclusive
+both count as not-pass. Incomplete and exploratory studies are excluded. Scoring
+refuses changed preregistrations or outcomes edited after the last verdict;
+recompute the verdict after recording an outcome correction.
+
 ## Development
 
 ```
 uv sync
 uv run pytest
 ```
+
+## License
+
+MIT. See [LICENSE](LICENSE).

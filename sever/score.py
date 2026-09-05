@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .study import load_yaml, studies_dir
+from .freeze import check
+from .study import StudyError, load_study, load_yaml, studies_dir
 
 
 def collect(root: Path) -> list[dict]:
@@ -13,13 +14,22 @@ def collect(root: Path) -> list[dict]:
         sf, vf = d / "study.yaml", d / "verdict.yaml"
         if not sf.exists() or not vf.exists():
             continue
-        study, verdict = load_yaml(sf), load_yaml(vf)
+        study, verdict = load_study(sf), load_yaml(vf)
         if verdict.get("exploratory"):
             continue
+        if verdict.get("missing") or verdict.get("status") == "incomplete":
+            continue
+        problems = check(d.name, root)
+        if problems:
+            raise StudyError(f"{d.name}: cannot score a broken freeze: {'; '.join(problems)}")
+        recorded = {row["id"]: row["outcome"] for row in verdict.get("predictions", [])}
+        current = {row["id"]: row.get("outcome") for row in study.get("predictions", [])}
+        if recorded != current:
+            raise StudyError(f"{d.name}: outcomes changed; recompute the verdict before scoring")
         prior = float(study["theory"]["prior_credence"])
         for p in study.get("predictions") or []:
             o = p.get("outcome")
-            if o not in ("pass", "fail"):
+            if o not in ("pass", "fail", "inconclusive"):
                 continue
             a, b = float(p["p_pass_if_true"]), float(p["p_pass_if_false"])
             rows.append({"study": d.name, "id": p["id"], "predicted": prior * a + (1 - prior) * b,

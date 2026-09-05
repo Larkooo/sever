@@ -8,7 +8,10 @@ from pathlib import Path
 
 import yaml
 
-from .study import StudyError, frozen_hash, lint, load_yaml, now_iso, save_yaml, study_dir
+from .study import (
+    StudyError, frozen_hash, lint, load_study, load_yaml, now_iso, save_yaml,
+    study_dir, structure_errors,
+)
 
 
 def _git(root: Path, *args: str) -> subprocess.CompletedProcess:
@@ -33,11 +36,21 @@ def file_at_commit(root: Path, commit: str, relpath: str) -> str:
     return r.stdout
 
 
+def study_at_commit(root: Path, commit: str, relpath: str) -> dict:
+    try:
+        study = yaml.safe_load(file_at_commit(root, commit, relpath))
+    except yaml.YAMLError as exc:
+        raise StudyError("committed study is not valid YAML") from exc
+    if not isinstance(study, dict) or structure_errors(study):
+        raise StudyError("committed study has an invalid structure")
+    return study
+
+
 def freeze(slug: str, root: Path) -> dict:
     d = study_dir(slug, root)
     if (d / "freeze.yaml").exists():
         raise StudyError("already frozen. A changed theory is a new version: run `sever new` for it")
-    study = load_yaml(d / "study.yaml")
+    study = load_study(d / "study.yaml")
     if any(p.get("outcome") is not None for p in study.get("predictions") or []):
         raise StudyError("outcomes are already recorded; a freeze must come before data")
     errors, _ = lint(study, slug)
@@ -47,7 +60,7 @@ def freeze(slug: str, root: Path) -> dict:
         raise StudyError("commit the study files first; the freeze records the commit they live in")
     commit = head(root)
     rel = str((d / "study.yaml").relative_to(root))
-    committed = yaml.safe_load(file_at_commit(root, commit, rel)) or {}
+    committed = study_at_commit(root, commit, rel)
     h = frozen_hash(study)
     if frozen_hash(committed) != h:
         raise StudyError("working copy differs from HEAD; commit first")
@@ -62,13 +75,13 @@ def check(slug: str, root: Path) -> list[str]:
     if not (d / "freeze.yaml").exists():
         return ["not frozen"]
     fz = load_yaml(d / "freeze.yaml")
-    study = load_yaml(d / "study.yaml")
+    study = load_study(d / "study.yaml")
     problems = []
     if frozen_hash(study) != fz.get("sha256"):
         problems.append("preregistered sections changed since the freeze "
                         "(theory, alternatives, predictions, analysis_plan, or kill_rule)")
     try:
-        committed = yaml.safe_load(file_at_commit(root, fz["commit"], fz["file"])) or {}
+        committed = study_at_commit(root, fz["commit"], fz["file"])
         if frozen_hash(committed) != fz.get("sha256"):
             problems.append("freeze record does not match the commit it names; freeze.yaml was edited")
     except (StudyError, KeyError):
