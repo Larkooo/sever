@@ -39,7 +39,7 @@ def test_noncritical_inconclusive_is_mixed_not_supported():
 
 
 def test_three_outcome_likelihoods_do_not_reverse_evidence():
-    # Codex's example: (pass, fail, inc) = (0.80, 0.15, 0.05) under H and (0.20, 0.05, 0.75) under R.
+    # Three-outcome example: (pass, fail, inc) = (0.80, 0.15, 0.05) under H and (0.20, 0.05, 0.75) under R.
     from sever.study import likelihood_ratios
     pred = {"p_pass_if_true": 0.8, "p_pass_if_false": 0.2, "p_fail_if_true": 0.15, "p_fail_if_false": 0.05}
     lr_pass, lr_fail, lr_inc, mode = likelihood_ratios(pred)
@@ -68,3 +68,26 @@ def test_only_weak_passes_is_weak_support():
     s = base()
     s["predictions"][0]["p_pass_if_true"], s["predictions"][0]["p_pass_if_false"] = 0.6, 0.4
     assert compute(s)["status"] == "supported-weakly"
+
+
+def test_critical_failure_refutes_even_with_missing_outcomes():
+    study = base()
+    study["predictions"][0]["outcome"] = "fail"
+    study["predictions"][1]["outcome"] = None
+    result = compute(study)
+    assert result["status"] == "refuted" and result["missing"] == ["P2"]
+
+
+def test_zero_probability_rival_updates_credence():
+    study = base()
+    study["predictions"][0]["p_pass_if_false"] = 0
+    assert compute(study)["posterior_credence"] == 1
+
+
+def test_zero_likelihood_records_negative_infinite_evidence():
+    import math
+    study = base()
+    study["predictions"][0].update(p_pass_if_true=1, outcome="fail")
+    result = compute(study)
+    assert result["posterior_credence"] == 0
+    assert result["log10_evidence"] == -math.inf

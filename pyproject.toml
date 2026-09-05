@@ -3,6 +3,8 @@ name = "sever"
 version = "0.1.0"
 description = "A research framework that makes theories earn their keep: preregistered predictions, severity-weighted evidence, mechanical verdicts, and a graveyard."
 requires-python = ">=3.11"
+readme = "README.md"
+license = "MIT"
 dependencies = ["pyyaml>=6.0"]
 
 [project.scripts]
@@ -12,7 +14,7 @@ sever = "sever.cli:main"
 dev = ["pytest>=8"]
 
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]

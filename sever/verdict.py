@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import math
 
-from .study import OUTCOMES, WEAK_LR, likelihood_ratios, now_iso
+from .study import OUTCOMES, WEAK_LR, StudyError, likelihood_ratios, now_iso
 
 STATUS_TEXT = {
     "refuted": "REFUTED. A critical prediction failed. This version is abandoned. The kill rule applies.",
@@ -18,8 +18,10 @@ STATUS_TEXT = {
 def compute(study: dict) -> dict:
     preds = study.get("predictions") or []
     prior = float(study["theory"]["prior_credence"])
-    odds = prior / (1 - prior)
+    if not 0 < prior < 1:
+        raise StudyError("prior_credence must be strictly between 0 and 1")
     log10_evidence = 0.0
+    zero_evidence = infinite_evidence = False
     rows, missing = [], []
     crit_fail = crit_incl = noncrit_fail = noncrit_incl = 0
     modes = set()
@@ -34,10 +36,11 @@ def compute(study: dict) -> dict:
         modes.add(mode)
         lr = {"pass": lr_pass, "fail": lr_fail, "inconclusive": lr_inc}[o]
         if math.isfinite(lr) and lr > 0:
-            odds *= lr
             log10_evidence += math.log10(lr)
         elif lr == 0:
-            odds = 0.0
+            zero_evidence = True
+        elif math.isinf(lr):
+            infinite_evidence = True
         critical = bool(p.get("critical"))
         rows.append({"id": p["id"], "critical": critical, "outcome": o,
                      "likelihood_ratio": round(lr, 3) if math.isfinite(lr) else "inf",
@@ -50,10 +53,10 @@ def compute(study: dict) -> dict:
             noncrit_fail += 1
         elif not critical and o == "inconclusive":
             noncrit_incl += 1
-    if missing:
-        status = "incomplete"
-    elif crit_fail:
+    if crit_fail:
         status = "refuted"
+    elif missing:
+        status = "incomplete"
     elif crit_incl:
         status = "inconclusive"
     elif noncrit_fail or noncrit_incl:
@@ -63,7 +66,18 @@ def compute(study: dict) -> dict:
         passes = [r for r in rows if r["outcome"] == "pass"]
         if passes and all(r["weak_test"] for r in passes):
             status = "supported-weakly"
-    posterior = odds / (1 + odds) if math.isfinite(odds) else 1.0
+    if zero_evidence and infinite_evidence:
+        raise StudyError("conflicting zero-probability forecasts; revise the forecast model")
+    if zero_evidence:
+        log10_evidence = -math.inf
+    elif infinite_evidence:
+        log10_evidence = math.inf
+    log_odds = math.log(prior) - math.log1p(-prior) + log10_evidence * math.log(10)
+    if log_odds >= 0:
+        posterior = 1 / (1 + math.exp(-log_odds))
+    else:
+        odds = math.exp(log_odds)
+        posterior = odds / (1 + odds)
     return {
         "status": status,
         "prior_credence": prior,
