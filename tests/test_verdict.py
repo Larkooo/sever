@@ -48,7 +48,7 @@ def test_three_outcome_likelihoods_do_not_reverse_evidence():
     assert abs(lr_fail - 3.0) < 1e-9          # binary mode would have given 0.25
     assert abs(lr_inc - 0.05 / 0.75) < 1e-9
     binary = likelihood_ratios({"p_pass_if_true": 0.8, "p_pass_if_false": 0.2})
-    assert binary[3] == "binary" and abs(binary[1] - 0.25) < 1e-9 and binary[2] == 1.0
+    assert binary[3] == "legacy" and abs(binary[1] - 0.25) < 1e-9 and binary[2] == 1.0
 
 
 def test_critical_inconclusive():
