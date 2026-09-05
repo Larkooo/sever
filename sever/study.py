@@ -133,7 +133,7 @@ def lint(study: dict, slug: str | None = None, frozen: bool = False) -> tuple[li
                 E.append(f"{pid}: likelihoods must be in [0, 1]")
             elif a <= b:
                 E.append(f"{pid}: p_pass_if_true ({a}) must exceed p_pass_if_false ({b}); otherwise a pass is not evidence")
-            elif a / max(b, 1e-9) < WEAK_LR:
+            elif a / max(b, 1e-9) < WEAK_LR - 1e-9:
                 W.append(f"{pid}: likelihood ratio {a / max(b, 1e-9):.1f} is below {WEAK_LR}; this is a weak test")
         except (TypeError, ValueError):
             E.append(f"{pid}: p_pass_if_true and p_pass_if_false are required")

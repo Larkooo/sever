@@ -37,7 +37,7 @@ def compute(study: dict) -> dict:
         critical = bool(p.get("critical"))
         rows.append({"id": p["id"], "critical": critical, "outcome": o,
                      "likelihood_ratio": round(lr, 3) if math.isfinite(lr) else "inf",
-                     "weak_test": lr_pass < WEAK_LR})
+                     "weak_test": lr_pass < WEAK_LR - 1e-9})
         if critical and o == "fail":
             crit_fail += 1
         elif critical and o == "inconclusive":
