@@ -32,6 +32,25 @@ def test_noncritical_fail_is_mixed():
     assert compute(s)["status"] == "mixed"
 
 
+def test_noncritical_inconclusive_is_mixed_not_supported():
+    s = base()
+    s["predictions"][1]["outcome"] = "inconclusive"
+    assert compute(s)["status"] == "mixed"
+
+
+def test_three_outcome_likelihoods_do_not_reverse_evidence():
+    # Codex's example: (pass, fail, inc) = (0.80, 0.15, 0.05) under H and (0.20, 0.05, 0.75) under R.
+    from sever.study import likelihood_ratios
+    pred = {"p_pass_if_true": 0.8, "p_pass_if_false": 0.2, "p_fail_if_true": 0.15, "p_fail_if_false": 0.05}
+    lr_pass, lr_fail, lr_inc, mode = likelihood_ratios(pred)
+    assert mode == "three-outcome"
+    assert abs(lr_pass - 4.0) < 1e-9
+    assert abs(lr_fail - 3.0) < 1e-9          # binary mode would have given 0.25
+    assert abs(lr_inc - 0.05 / 0.75) < 1e-9
+    binary = likelihood_ratios({"p_pass_if_true": 0.8, "p_pass_if_false": 0.2})
+    assert binary[3] == "binary" and abs(binary[1] - 0.25) < 1e-9 and binary[2] == 1.0
+
+
 def test_critical_inconclusive():
     s = base()
     s["predictions"][0]["outcome"] = "inconclusive"

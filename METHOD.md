@@ -24,7 +24,7 @@ Each principle has a source. None of this is new. The contribution is making it 
 
 **7. A refuted theory is not patched.** (Lakatos, 1970.) A revision is a new version that names what it supersedes and makes at least one new prediction that the killing data do not already entail. If the only thing the new version predicts is the data that killed the old one, the programme is degenerating and the revision goes to the graveyard with its parent.
 
-**8. Keep the books.** A prior credence before, a posterior after, computed from likelihood ratios written before the data. Across studies, calibration is scored (Brier, 1950). Persistent overconfidence is a finding about the researcher and is corrected like any other finding: lower the priors, raise the bar.
+**8. Keep the books.** A prior credence before, an updated credence after, computed from forecasts written before the data. These are forecasts, not measured likelihoods, and the update is a heuristic score. Across studies, calibration is scored (Brier, 1950). Persistent overconfidence is a finding about the researcher and is corrected like any other finding: lower the priors, raise the bar.
 
 **9. Effect sizes and robustness, not direction.** A difference that vanishes when the seed, the population size or the horizon changes is not a difference. Finite-size and nuisance-parameter checks come before any sentence that starts with "the system".
 
@@ -42,7 +42,7 @@ Each principle has a source. None of this is new. The contribution is making it 
 3. **Rivals.** At least one.
 4. **Predictions.** Each with `pass_if`, `fail_if`, `critical`, and the two likelihoods.
 5. **Plan and kill rule.** What will be computed, and what would make you stop.
-6. **Freeze.** `sever lint`, commit, `sever freeze`, commit.
+6. **Design pilot, then freeze.** Show on excluded data or simulation that the design can resolve the prediction. Then `sever lint`, commit, `sever freeze`, commit.
 7. **Run.** Do not touch the frozen sections. Record each outcome by applying its criteria literally, with a pointer to the evidence.
 8. **Review.** Write the case against.
 9. **Verdict.** `sever verdict`. Accept the output.
@@ -54,16 +54,24 @@ Supported, refuted, mixed, inconclusive. Never proven, confirmed, validated, or 
 
 ## How the verdict is computed
 
-Each prediction carries two numbers written before data: P(pass | theory true) and P(pass | best rival true). A pass multiplies the odds on the theory by their ratio. A fail multiplies by the ratio of the complements. An inconclusive outcome multiplies by one. The posterior is reported next to the prior, with the total evidence in log10 units. Ratios are multiplied as if the predictions were independent, which they rarely are, so the posterior is a bookkeeping device and not a probability to bet on. The status is decided by rules, not by the posterior:
+Each prediction carries forecasts written before data: P(pass | theory) and P(pass | best rival), and, recommended, P(fail | theory) and P(fail | best rival). Inconclusive is the remainder under each hypothesis. Each recorded outcome multiplies the odds on the theory by the ratio of its probabilities under the two hypotheses. If only the pass probabilities are given, the tool runs in binary mode: fail and inconclusive are pooled as "not pass" and inconclusive gets a ratio of one. That is a heuristic and the report says so, because with three outcomes "not pass" is not "fail".
+
+The resulting number is bookkeeping, not a calibrated posterior. The forecasts are subjective, the rivals are usually narrative rather than predictive distributions, and the ratios are multiplied as if the predictions were independent. Record the forecasts, score them for calibration across studies, and do not present them as measured evidential likelihoods or as odds to bet at. The status is decided by rules, not by the number:
 
 | status | rule |
 |---|---|
 | refuted | any critical prediction failed |
 | inconclusive | no critical failure, but a critical prediction was inconclusive |
-| mixed | critical predictions passed, at least one non-critical failed |
-| supported | everything passed |
-| supported-weakly | everything passed, but every passing test had a likelihood ratio under 3 |
+| mixed | every critical prediction passed, and at least one non-critical prediction failed or was inconclusive; both are listed and carry forward |
+| supported | every prediction passed |
+| supported-weakly | every prediction passed, but every passing test had a likelihood ratio under 3 |
 | incomplete | some outcome is not recorded |
+
+A critical failure refutes the specified bundle of theory, model, and analysis assumptions. It does not refute a mathematical identity the theory used; identities are proved, not tested.
+
+## Design before freeze
+
+A frozen prediction is only as good as the design behind it. Before freezing, run a design pilot on excluded data or on simulation under the theory and under the main rival: check that the estimator can resolve the predicted effect, that the intervals have the coverage you claim, and that the pass and fail criteria are reachable under each hypothesis. A useful target is a high chance of a decisive outcome under the theory and a low chance under a meaningfully different rival. Record the pilot in the notebook. A study that skips this can pass or fail for reasons that have nothing to do with the theory, and the second study in the worked example did exactly that.
 
 ## Worked example
 

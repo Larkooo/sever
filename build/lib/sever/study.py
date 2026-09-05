@@ -67,26 +67,12 @@ def frozen_hash(study: dict) -> str:
     return hashlib.sha256(blob.encode()).hexdigest()
 
 
-def _ratio(num: float, den: float) -> float:
-    num, den = max(num, 0.0), max(den, 0.0)
-    if den <= 1e-12:
-        return 1.0 if num <= 1e-12 else float("inf")
-    return num / den
-
-
-def likelihood_ratios(pred: dict) -> tuple[float, float, float, str]:
-    """(LR if pass, LR if fail, LR if inconclusive, mode).
-
-    mode is 'three-outcome' when P(fail | .) is given for both hypotheses, so that
-    inconclusive is the remainder and gets its own ratio. Otherwise mode is 'binary':
-    fail and inconclusive are pooled as 'not pass', and inconclusive gets LR 1 as a
-    heuristic. With three possible outcomes, 'not pass' is not 'fail'."""
+def likelihood_ratios(pred: dict) -> tuple[float, float]:
+    """(LR if the prediction passes, LR if it fails)."""
     a, b = float(pred["p_pass_if_true"]), float(pred["p_pass_if_false"])
-    lr_pass = _ratio(a, b)
-    if pred.get("p_fail_if_true") is None or pred.get("p_fail_if_false") is None:
-        return lr_pass, _ratio(1 - a, 1 - b), 1.0, "binary"
-    ft, fr = float(pred["p_fail_if_true"]), float(pred["p_fail_if_false"])
-    return lr_pass, _ratio(ft, fr), _ratio(1 - a - ft, 1 - b - fr), "three-outcome"
+    lr_pass = a / b if b > 0 else float("inf")
+    lr_fail = (1 - a) / (1 - b) if b < 1 else float("inf")
+    return lr_pass, lr_fail
 
 
 def _text(x) -> str:
@@ -149,16 +135,6 @@ def lint(study: dict, slug: str | None = None, frozen: bool = False) -> tuple[li
                 E.append(f"{pid}: p_pass_if_true ({a}) must exceed p_pass_if_false ({b}); otherwise a pass is not evidence")
             elif a / max(b, 1e-9) < WEAK_LR - 1e-9:
                 W.append(f"{pid}: likelihood ratio {a / max(b, 1e-9):.1f} is below {WEAK_LR}; this is a weak test")
-            ft, fr = p.get("p_fail_if_true"), p.get("p_fail_if_false")
-            if ft is None or fr is None:
-                W.append(f"{pid}: no P(fail | .) given; fail and inconclusive are pooled as 'not pass' and "
-                         f"inconclusive gets LR 1 (binary mode, heuristic)")
-            else:
-                ft, fr = float(ft), float(fr)
-                if not (0 <= ft <= 1 and 0 <= fr <= 1):
-                    E.append(f"{pid}: P(fail | .) must be in [0, 1]")
-                elif a + ft > 1 + 1e-9 or b + fr > 1 + 1e-9:
-                    E.append(f"{pid}: P(pass) + P(fail) exceeds 1 under one hypothesis")
         except (TypeError, ValueError):
             E.append(f"{pid}: p_pass_if_true and p_pass_if_false are required")
         if p.get("critical"):

@@ -14,6 +14,8 @@ This repository runs research under the method in METHOD.md. When you work on a 
 - Separate in `theory.formal` what the math entails from what is conjecture. Predictions the math entails are tests of the code, not the theory. Do not count them as evidence.
 - The analysis plan names parameters, seeds, sample sizes, horizons, and the statistic. Do not leave any of these to be chosen later.
 - Write the kill rule before the data. It states what refutes this version and what a revision must add.
+- Give P(fail | .) as well as P(pass | .). Treat all of them as forecasts, not measured likelihoods, and never present the updated credence as odds to bet at.
+- Run a design pilot on excluded data or simulation before the freeze. If the estimator cannot resolve the predicted effect, fix the design, not the numbers.
 
 ## After the freeze
 

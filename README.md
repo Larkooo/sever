@@ -41,7 +41,7 @@ sever graveyard                      # what died, what killed it, what replaced 
 | `lint [slug]` | errors block freezing: empty criteria, no rival, no critical prediction, likelihoods that make a pass uninformative. Warnings: criteria without numbers, weak tests, extreme priors |
 | `freeze <slug>` | record the commit and the hash of the frozen sections. Refuses uncommitted changes, recorded outcomes, or lint errors |
 | `check <slug>` | verify the working copy and the named commit both hash to the frozen value |
-| `verdict <slug>` | compute status and posterior from recorded outcomes. Refuses a broken freeze (unless `--exploratory`) and refuses an empty adversarial review |
+| `verdict <slug>` | compute status and a heuristic credence update from recorded outcomes. Refuses a broken freeze (unless `--exploratory`) and refuses an empty adversarial review |
 | `status` | table of studies, state, outcomes recorded |
 | `score` | Brier score of predicted pass probabilities against observed outcomes across concluded studies |
 | `graveyard` | refuted theories, the predictions that killed them, and their successors |
